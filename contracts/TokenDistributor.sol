@@ -34,12 +34,31 @@ contract TokenDistributor is Ownable, Gelatofied {
         emit LogFundsDeposited(msg.sender, msg.value);
     }
 
+    modifier checkAllocation(uint256[] memory _allocation) {
+        uint256 totalPercent;
+        for (uint256 x; x < _allocation.length; x++) {
+            totalPercent = totalPercent.add(_allocation[x]);
+        }
+        require(
+            totalPercent == 100,
+            "TokenDistributor: checkAllocation: Invalid Allocation"
+        );
+        _;
+    }
+
+    // set specs for token distributor
+    // user can set specs for multiple tokens at once with
+    // different threshold but same allocation
     function setDistributorSpecs(
         address[] calldata _tokenAddresses,
         uint256[] calldata _balanceThreshold,
         address[] calldata _receivers,
         uint256[] calldata _allocation
     ) external onlyOwner checkAllocation(_allocation) {
+        require(
+            _tokenAddresses.length == _balanceThreshold.length,
+            "TokenDistributor: setDistributorSpecs: Address and threshold length unequal"
+        );
         for (uint256 x; x < _tokenAddresses.length; x++) {
             address _tokenAddress = _tokenAddresses[x];
             tokenDistributorSpecs[_tokenAddress] = DistributorSpecs({
@@ -52,6 +71,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         }
     }
 
+    // gelato execution
     function exec(address _tokenAddress, uint256 _fee) external {
         require(
             distributorEnabledTokens.contains(_tokenAddress),
@@ -65,6 +85,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         distribute(_tokenAddress, _fee);
     }
 
+    // owner to withdraw funds
     function withdraw(address _tokenAddress) external onlyOwner {
         uint256[] memory _amtToSend = new uint256[](1);
         _amtToSend[0] = getBalance(_tokenAddress);
@@ -75,6 +96,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         transferToAddresses(_receivers, _tokenAddress, _amtToSend);
     }
 
+    // get specs of token distributor
     function getDistributorSpecs(address _tokenAddress)
         external
         view
@@ -91,6 +113,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         _allocation = _distributorSpecs.allocation;
     }
 
+    // get all distributors that are set up
     function getDistributors()
         external
         view
@@ -103,6 +126,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         }
     }
 
+    // get token balances of this contract
     function getBalance(address _tokenAddress)
         public
         view
@@ -116,14 +140,11 @@ contract TokenDistributor is Ownable, Gelatofied {
         }
     }
 
+    // get distributor specs and initate transfer
     function distribute(address _tokenAddress, uint256 _fee)
         internal
         gelatofy(_fee, _tokenAddress)
     {
-        require(
-            hasThresholdReached(_tokenAddress),
-            "TokenDistributor: distribute: Insufficient balance"
-        );
         DistributorSpecs memory _distributorSpecs =
             tokenDistributorSpecs[_tokenAddress];
 
@@ -138,6 +159,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         transferToAddresses(_receivers, _tokenAddress, _amtToSend);
     }
 
+    // transfer tokens to receivers
     function transferToAddresses(
         address[] memory _receivers,
         address _tokenAddress,
@@ -148,7 +170,7 @@ contract TokenDistributor is Ownable, Gelatofied {
                 (bool success, ) = _receivers[x].call{value: _amtToSend[x]}("");
                 require(
                     success,
-                    "TokenDistributor: distribute: Fail to distribute"
+                    "TokenDistributor: transferToAddresses: ETH transfer failed"
                 );
             } else {
                 SafeERC20.safeTransfer(
@@ -160,6 +182,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         }
     }
 
+    // check if token balance of contract has reached pre-defined specs
     function hasThresholdReached(address _tokenAddress)
         internal
         view
@@ -171,6 +194,7 @@ contract TokenDistributor is Ownable, Gelatofied {
             tokenDistributorSpecs[_tokenAddress].balanceThreshold);
     }
 
+    // sort amount to send to each receivers after fees
     function getAmtToSend(
         uint256 _fee,
         uint256 _balance,
@@ -181,17 +205,5 @@ contract TokenDistributor is Ownable, Gelatofied {
         for (uint256 x; x < _allocation.length; x++) {
             _amtToSend[x] = _balance.mul(_allocation[x]).div(100);
         }
-    }
-
-    modifier checkAllocation(uint256[] memory _allocation) {
-        uint256 totalPercent;
-        for (uint256 x; x < _allocation.length; x++) {
-            totalPercent = totalPercent.add(_allocation[x]);
-        }
-        require(
-            totalPercent == 100,
-            "TokenDistributor: checkAllocation: Invalid Allocation"
-        );
-        _;
     }
 }

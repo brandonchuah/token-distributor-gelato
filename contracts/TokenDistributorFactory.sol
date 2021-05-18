@@ -29,6 +29,11 @@ contract TokenDistributorFactory is Ownable {
         address[] calldata _receivers,
         uint256[] calldata _allocation
     ) external {
+        require(
+            distributorByOwner[msg.sender] == payable(address(0)),
+            "TokenDistributorFactory: createTokenDistributor: Already created TokenDistributor"
+        );
+
         TokenDistributor tokenDistributor = new TokenDistributor(gelato);
         tokenDistributor.setDistributorSpecs(
             _tokenAddress,
@@ -46,6 +51,7 @@ contract TokenDistributorFactory is Ownable {
         emit LogContractDeployed(address(tokenDistributor), msg.sender);
     }
 
+    // get all deployed token ditributors
     function getTokenDistributors()
         external
         view

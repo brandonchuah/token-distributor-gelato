@@ -82,6 +82,15 @@ describe("TokenDistributorFactory", function() {
       tokenDistributor = await ethers.getContractAt("TokenDistributor", tokenDistributorAddress);
     })
 
+    it("Each user can only create one distributor", async function(){
+      await expect(tokenDistributorFactory.createTokenDistributor(
+        [daiAddress],
+        [ethers.utils.parseEther("4"), ethers.utils.parseEther("7")],
+        [receiver1Address, receiver2Address],
+        [40, 60]
+      )).to.be.revertedWith("TokenDistributorFactory: createTokenDistributor: Already created TokenDistributor")
+    })
+
     it("Transfer ownership to user", async function(){
       expect(await tokenDistributor.owner()).to.be.eql(userAddress);
 
