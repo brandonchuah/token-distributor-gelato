@@ -2,10 +2,6 @@ const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
 const { getGasPrice } = require("./helpers/gelatoHelper");
 
-const sleep = (milliseconds) => {
-    return new Promise(resolve => setTimeout(resolve, milliseconds))
-}
-
 describe("TokenDistributorFactory", function() {
   var tokenDistributor, tokenDistributorAddress;
   var tokenDistributorFactory;

@@ -15,18 +15,6 @@ const addresses_mainnet = {
   deployer: "0x2F4dAcdD6613Dd2d41Ea0C578d7E666bbDAf3424",
 }
 
-const addresses_kovan = {
-  LINK_Token: "0xa36085f69e2889c224210f603d836748e7dc0088",
-  deployer: "0x2F4dAcdD6613Dd2d41Ea0C578d7E666bbDAf3424"
-}
-
-const addresses_rinkeby = {
-  DAI: "0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea",
-  LINK: "0x01BE23585060835E02B77ef475b0Cc51aA1e0709",
-  gelato: "0x514910771af9ca656af840dff83e8264ecf986ca",
-  deployer: "0x2F4dAcdD6613Dd2d41Ea0C578d7E666bbDAf3424",
-}
-
 const link_abi = require("./test/abi/link.json")
 const dai_abi = require("./test/abi/dai.json")
 
@@ -47,11 +35,6 @@ module.exports = {
       },
       ...addresses_mainnet,
       abi
-    },
-    kovan: {
-      accounts: [privatekey],
-      url: `https://eth-kovan.alchemyapi.io/v2/${ALCHEMY_ID}`,
-      ...addresses_kovan,
     }
   }
 }

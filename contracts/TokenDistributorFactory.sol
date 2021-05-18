@@ -10,14 +10,14 @@ import {
 contract TokenDistributorFactory is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    EnumerableSet.AddressSet internal tokenDistributors;
-
     mapping(address => address) public distributorByOwner;
     mapping(address => address) public ownerByDistributor;
 
-    event LogContractDeployed(address indexed distributor, address owner);
+    EnumerableSet.AddressSet internal tokenDistributors;
 
     address payable public immutable gelato;
+
+    event LogContractDeployed(address indexed distributor, address owner);
 
     constructor(address payable _gelato) {
         gelato = _gelato;
