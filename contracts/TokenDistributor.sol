@@ -25,6 +25,7 @@ contract TokenDistributor is Ownable, Gelatofied {
 
     EnumerableSet.AddressSet internal distributorEnabledTokens;
     mapping(address => DistributorSpecs) public tokenDistributorSpecs;
+    mapping(address => bytes32) public hashes;
 
     event LogFundsDeposited(address indexed sender, uint256 amount);
 
@@ -40,49 +41,66 @@ contract TokenDistributor is Ownable, Gelatofied {
             totalPercent = totalPercent.add(_allocation[x]);
         }
         require(
-            totalPercent == 100,
+            totalPercent == 10000,
             "TokenDistributor: checkAllocation: Invalid Allocation"
         );
         _;
     }
 
     // set specs for token distributor
-    // user can set specs for multiple tokens at once with
-    // different threshold but same allocation
     function setDistributorSpecs(
-        address[] calldata _tokenAddresses,
-        uint256[] calldata _balanceThreshold,
+        address _tokenAddress,
+        uint256 _balanceThreshold,
         address[] calldata _receivers,
         uint256[] calldata _allocation
     ) external onlyOwner checkAllocation(_allocation) {
-        require(
-            _tokenAddresses.length == _balanceThreshold.length,
-            "TokenDistributor: setDistributorSpecs: Address and threshold length unequal"
+        tokenDistributorSpecs[_tokenAddress] = DistributorSpecs({
+            balanceThreshold: _balanceThreshold,
+            receivers: _receivers,
+            allocation: _allocation
+        });
+
+        hashes[_tokenAddress] = keccak256(
+            abi.encode(_balanceThreshold, _receivers, _allocation)
         );
-        for (uint256 x; x < _tokenAddresses.length; x++) {
-            address _tokenAddress = _tokenAddresses[x];
-            tokenDistributorSpecs[_tokenAddress] = DistributorSpecs({
-                balanceThreshold: _balanceThreshold[x],
-                receivers: _receivers,
-                allocation: _allocation
-            });
-            if (!distributorEnabledTokens.contains(_tokenAddress))
-                distributorEnabledTokens.add(_tokenAddress);
-        }
+
+        if (!distributorEnabledTokens.contains(_tokenAddress))
+            distributorEnabledTokens.add(_tokenAddress);
     }
 
     // gelato execution
-    function exec(address _tokenAddress, uint256 _fee) external {
+    function exec(
+        address _tokenAddress,
+        uint256 _balanceThreshold,
+        address[] calldata _receivers,
+        uint256[] calldata _allocation,
+        uint256 _fee
+    ) external {
         require(
             distributorEnabledTokens.contains(_tokenAddress),
             "TokenDistributor: exec: Distributor not enabled"
+        );
+        require(
+            compareSpecs(
+                _tokenAddress,
+                _balanceThreshold,
+                _receivers,
+                _allocation
+            ),
+            "TokenDistributor: exec: Hash invalid"
         );
         require(
             hasThresholdReached(_tokenAddress),
             "TokenDistributor: exec: Threshold not reached"
         );
 
-        distribute(_tokenAddress, _fee);
+        distribute(
+            _tokenAddress,
+            _balanceThreshold,
+            _receivers,
+            _allocation,
+            _fee
+        );
     }
 
     // owner to withdraw funds
@@ -141,20 +159,15 @@ contract TokenDistributor is Ownable, Gelatofied {
     }
 
     // get distributor specs and initate transfer
-    function distribute(address _tokenAddress, uint256 _fee)
-        internal
-        gelatofy(_fee, _tokenAddress)
-    {
-        DistributorSpecs memory _distributorSpecs =
-            tokenDistributorSpecs[_tokenAddress];
-
-        address[] memory _receivers = _distributorSpecs.receivers;
+    function distribute(
+        address _tokenAddress,
+        uint256 _balanceThreshold,
+        address[] memory _receivers,
+        uint256[] memory _allocation,
+        uint256 _fee
+    ) internal gelatofy(_fee, _tokenAddress) {
         uint256[] memory _amtToSend =
-            getAmtToSend(
-                _fee,
-                _distributorSpecs.balanceThreshold,
-                _distributorSpecs.allocation
-            );
+            getAmtToSend(_fee, _balanceThreshold, _allocation);
 
         transferToAddresses(_receivers, _tokenAddress, _amtToSend);
     }
@@ -182,6 +195,17 @@ contract TokenDistributor is Ownable, Gelatofied {
         }
     }
 
+    function compareSpecs(
+        address _tokenAddress,
+        uint256 _balanceThreshold,
+        address[] calldata _receivers,
+        uint256[] calldata _allocation
+    ) internal view returns (bool) {
+        return
+            hashes[_tokenAddress] ==
+            keccak256(abi.encode(_balanceThreshold, _receivers, _allocation));
+    }
+
     // check if token balance of contract has reached pre-defined specs
     function hasThresholdReached(address _tokenAddress)
         internal
@@ -195,6 +219,7 @@ contract TokenDistributor is Ownable, Gelatofied {
     }
 
     // sort amount to send to each receivers after fees
+    // allocation can have up to 3dp e.g. 45.501 %
     function getAmtToSend(
         uint256 _fee,
         uint256 _balance,
@@ -203,7 +228,7 @@ contract TokenDistributor is Ownable, Gelatofied {
         _amtToSend = new uint256[](_allocation.length);
         _balance = _balance.sub(_fee);
         for (uint256 x; x < _allocation.length; x++) {
-            _amtToSend[x] = _balance.mul(_allocation[x]).div(100);
+            _amtToSend[x] = _balance.mul(_allocation[x]).div(10000);
         }
     }
 }

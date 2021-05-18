@@ -17,6 +17,7 @@ describe("TokenDistributorFactory", function() {
   var deployer, userAddress, receiver1Address, receiver2Address, executorAddress;
   var gasPrice;
   var linkFee, ethFee;
+  var expected_link_distributorSpecs, expected_eth_distributorSpecs;
 
     this.timeout(0);
 
@@ -58,10 +59,10 @@ describe("TokenDistributorFactory", function() {
       tokenDistributorFactory = tokenDistributorFactory.connect(user);
 
       var txn = await tokenDistributorFactory.createTokenDistributor(
-        [linkAddress, ethAddress],
-        [ethers.utils.parseEther("4"), ethers.utils.parseEther("7")],
+        linkAddress,
+        ethers.utils.parseEther("4"),
         [receiver1Address, receiver2Address],
-        [40, 60]
+        [4550, 5450]
       )
       await txn.wait();
 
@@ -82,24 +83,38 @@ describe("TokenDistributorFactory", function() {
       tokenDistributor = await ethers.getContractAt("TokenDistributor", tokenDistributorAddress);
     })
 
+    it("Set distributor specs", async function(){
+      tokenDistributor = tokenDistributor.connect(user);
+
+      var txn = await tokenDistributor.setDistributorSpecs(
+        ethAddress,
+        ethers.utils.parseEther("7"),
+        [receiver1Address, receiver2Address],
+        [4000, 6000]
+      )
+      await txn.wait();
+    })
+
     it("Each user can only create one distributor", async function(){
       await expect(tokenDistributorFactory.createTokenDistributor(
-        [daiAddress],
-        [ethers.utils.parseEther("4"), ethers.utils.parseEther("7")],
+        daiAddress,
+        ethers.utils.parseEther("4"),
         [receiver1Address, receiver2Address],
-        [40, 60]
+        [4000, 6000]
       )).to.be.revertedWith("TokenDistributorFactory: createTokenDistributor: Already created TokenDistributor")
     })
 
     it("Transfer ownership to user", async function(){
       expect(await tokenDistributor.owner()).to.be.eql(userAddress);
 
+      tokenDistributor = tokenDistributor.connect(deployer);
+
       await expect(
        tokenDistributor.setDistributorSpecs(
-          [linkAddress],
-          [ethers.utils.parseEther("1")],
+          linkAddress,
+          ethers.utils.parseEther("1"),
           [receiver1Address],
-          [100]
+          [10000]
         )
       ).to.be.revertedWith("Ownable: caller is not the owner");
     })
@@ -109,17 +124,17 @@ describe("TokenDistributorFactory", function() {
       tokenDistributor = tokenDistributor.connect(user);
 
       const link_distributorSpecs = await tokenDistributor.getDistributorSpecs(linkAddress);
-      const expected_link_distributorSpecs = [
+      expected_link_distributorSpecs = [
         ethers.utils.parseEther("4"),
         [receiver1Address, receiver2Address],
-        [ethers.BigNumber.from(40), ethers.BigNumber.from(60)]
+        [ethers.BigNumber.from(4550), ethers.BigNumber.from(5450)]
       ]
 
       const eth_distributorSpecs = await tokenDistributor.getDistributorSpecs(ethAddress);
-      const expected_eth_distributorSpecs = [
+      expected_eth_distributorSpecs = [
         ethers.utils.parseEther("7"),
         [receiver1Address, receiver2Address],
-        [ethers.BigNumber.from(40), ethers.BigNumber.from(60)]
+        [ethers.BigNumber.from(4000), ethers.BigNumber.from(6000)]
       ]
       expect(link_distributorSpecs).to.be.eql(expected_link_distributorSpecs);
       expect(eth_distributorSpecs).to.be.eql(expected_eth_distributorSpecs);
@@ -141,7 +156,7 @@ describe("TokenDistributorFactory", function() {
     })
 
     it("Gelato should execute LINK distribution when threshold is met", async function(){
-      const dummyPayload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, 1]);
+      const dummyPayload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, ...expected_link_distributorSpecs, 1]);
       const executors = await gelatoContract.executors();
       executorAddress = executors[1];
 
@@ -159,14 +174,14 @@ describe("TokenDistributorFactory", function() {
         linkAddress
       );
 
-      const payload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, linkFee]);
+      const payload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, ...expected_link_distributorSpecs, linkFee]);
         
       await expect(
         gelatoContract.exec(tokenDistributorAddress, payload, linkAddress)
       ).to.emit(gelatoContract, "LogExecSuccess");
 
-      const expected_receiver1_link = (4 - ethers.utils.formatEther(linkFee)) * 40 / 100;
-      const expected_receiver2_link = (4 - ethers.utils.formatEther(linkFee)) * 60 / 100;
+      const expected_receiver1_link = (4 - ethers.utils.formatEther(linkFee)) * 45.5 / 100;
+      const expected_receiver2_link = (4 - ethers.utils.formatEther(linkFee)) * 54.5 / 100;
       const receiver1_link = ethers.utils.formatEther(await linkContract.balanceOf(receiver1Address));
       const receiver2_link = ethers.utils.formatEther(await linkContract.balanceOf(receiver2Address));
      
@@ -176,7 +191,7 @@ describe("TokenDistributorFactory", function() {
     })
 
     it("Gelato should execute ETH distribution when threshold is met", async function(){
-      const dummyPayload = tokenDistributor.interface.encodeFunctionData("exec", [ethAddress, 1]);
+      const dummyPayload = tokenDistributor.interface.encodeFunctionData("exec", [ethAddress, ...expected_eth_distributorSpecs, 1]);
 
       [ethFee,] = await gelatoContract.callStatic.estimateExecGasDebit(
         tokenDistributorAddress, 
@@ -187,7 +202,7 @@ describe("TokenDistributorFactory", function() {
       const receiver1_eth_before = await ethers.provider.getBalance(receiver1Address);
       const receiver2_eth_before = await ethers.provider.getBalance(receiver2Address);
 
-      const payload = tokenDistributor.interface.encodeFunctionData("exec", [ethAddress, ethFee]);
+      const payload = tokenDistributor.interface.encodeFunctionData("exec", [ethAddress, ...expected_eth_distributorSpecs, ethFee]);
 
       await expect(
         gelatoContract.exec(tokenDistributorAddress, payload, ethAddress)
@@ -208,7 +223,7 @@ describe("TokenDistributorFactory", function() {
     })
 
     it("Gelato should not execute when threshold is not met", async function(){
-      const payload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, linkFee]);
+      const payload = tokenDistributor.interface.encodeFunctionData("exec", [linkAddress, ...expected_link_distributorSpecs, linkFee]);
 
       await expect(
         gelatoContract.exec(tokenDistributorAddress, payload, linkAddress)
@@ -251,10 +266,10 @@ describe("TokenDistributorFactory", function() {
 
     it("Revert if allocation is not set properly", async function(){
       await expect(tokenDistributor.setDistributorSpecs(
-        [ethAddress],
-        [ethers.utils.parseEther("7")],
+        ethAddress,
+        ethers.utils.parseEther("7"),
         [receiver1Address, receiver2Address],
-        [40, 50]
+        [4000, 5000]
       )).to.be.revertedWith("TokenDistributor: checkAllocation: Invalid Allocation");
     })
 

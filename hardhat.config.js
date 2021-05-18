@@ -3,7 +3,8 @@ require("@nomiclabs/hardhat-ethers");
 
 require('dotenv').config();
 
-const ALCHEMY_ID = process.env.ALCHEMY_ID;
+const ALCHEMY_MAINNET = process.env.ALCHEMY_MAINNET;
+const ALCHEMY_ROPSTEN = process.env.ALCHEMY_ROPSTEN;
 const privatekey = process.env.PRIVATE_KEY;
 
 const addresses_mainnet = {
@@ -12,7 +13,12 @@ const addresses_mainnet = {
   DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
   Gelato: "0x3CACa7b48D0573D793d3b0279b5F0029180E83b6",
   GelatoGasPriceOracle: "0x169E633A2D1E6c10dD91238Ba11c4A708dfEF37C",
-  deployer: "0x2F4dAcdD6613Dd2d41Ea0C578d7E666bbDAf3424",
+}
+
+const addresses_ropsten = {
+  ETH: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+  Gelato: "0xCc4CcD69D31F9FfDBD3BFfDe49c6aA886DaB98d9",
+  GelatoGasPriceOracle: "0x20F44678Fc2344a78E84192e82Cede989Bf1da6F",
 }
 
 const link_abi = require("./test/abi/link.json")
@@ -30,10 +36,16 @@ module.exports = {
       // Standard config
       // timeout: 150000,
       forking: {
-        url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
+        url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_MAINNET}`,
         blockNumber: 12450260,
       },
       ...addresses_mainnet,
+      abi
+    },
+    ropsten: {
+      url: `https://eth-ropsten.alchemyapi.io/v2/${ALCHEMY_ROPSTEN}`,
+      accounts: [privatekey],
+      ...addresses_ropsten,
       abi
     }
   }

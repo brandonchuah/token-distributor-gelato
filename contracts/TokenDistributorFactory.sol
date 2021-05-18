@@ -24,8 +24,8 @@ contract TokenDistributorFactory is Ownable {
     }
 
     function createTokenDistributor(
-        address[] calldata _tokenAddress,
-        uint256[] calldata _balanceThreshold,
+        address _tokenAddress,
+        uint256 _balanceThreshold,
         address[] calldata _receivers,
         uint256[] calldata _allocation
     ) external {
